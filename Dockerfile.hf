@@ -1,0 +1,51 @@
+# syntax=docker/dockerfile:1.4
+# META//FLOW on HuggingFace Spaces — public port 7860.
+#
+# The Space holds only this Dockerfile + README; it CLONES the private GitHub
+# repo at build time via a BuildKit GIT_PAT secret mount (glm2api pattern).
+# Set the Space secret GIT_PAT before building.
+#
+# Runtime secrets (Space settings → Secrets):
+#   ADMIN_PASSWORD — control-plane password (default meta-admin; CHANGE IT)
+#   API_KEY        — required Bearer key for /v1/* endpoints (public Space: set it!)
+#   SEED_COOKIE    — optional: full meta.ai Cookie header to seed the first account
+#   SEED_TOKEN     — optional: matching ecto1: token
+# Persistent state (accounts/tokens) lives in /data — attach an HF volume to keep it.
+FROM node:22-slim-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -u 1000 -s /bin/bash user \
+    && mkdir -p /app /data \
+    && chown -R 1000:1000 /app /data
+
+WORKDIR /app
+
+ARG GIT_BRANCH=main
+RUN --mount=type=secret,id=GIT_PAT,mode=0444 \
+    echo "cloning branch=$GIT_BRANCH" \
+    && PAT="$(cat /run/secrets/GIT_PAT 2>/dev/null || true)" \
+    && for i in 1 2 3 4 5; do \
+         git clone --depth 1 --branch "$GIT_BRANCH" \
+           "https://x-access-token:${PAT}@github.com/Sexlovr/metaflow.git" /app && break; \
+         echo "git clone attempt $i failed; retrying in 5s"; sleep 5; \
+       done \
+    && rm -rf /app/.git \
+    && test -f /app/meta_lib.js && test -f /app/server.js
+
+RUN chown -R 1000:1000 /app
+
+ENV PORT=7860 \
+    HOST=0.0.0.0 \
+    DATA_DIR=/data \
+    NODE_ENV=production \
+    HOME=/home/user
+
+USER 1000
+EXPOSE 7860
+
+CMD ["node", "server.js"]

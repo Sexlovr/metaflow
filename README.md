@@ -27,3 +27,16 @@ Private OpenAI-compatible proxy + control plane for Meta AI (meta.ai).
 - `conn556_00.bin` / `conn556_01.bin` / `verbatim_0d.bin` / `attachment_frame.b64` — captured browser frame templates (session-bound field values ride inside; craft per-account templates if the server rejects a different account session)
 
 Reverse-engineered 2026-09-09. Not affiliated with Meta.
+
+## HuggingFace Space deployment (Docker)
+
+1. Create a new Docker Space.
+2. Copy `Dockerfile.hf` into the Space root as `Dockerfile`, and `SPACE-README.md` as `README.md`.
+3. Space Settings → Secrets:
+   - `GIT_PAT` (required) — GitHub PAT with read access to `Sexlovr/metaflow` (the build clones the repo via a BuildKit secret mount)
+   - `ADMIN_PASSWORD` — control-plane login (change from the default)
+   - `API_KEY` — Bearer key for `/v1/*` endpoints (set it — a public Space without it is an open proxy)
+   - `SEED_COOKIE` + `SEED_TOKEN` (optional) — meta.ai Cookie header + `ecto1:` token to seed the first account
+4. Optional: attach a volume at `/data` to persist `state.json` (account pool) across restarts.
+
+The Space binds `0.0.0.0:7860`. Every conversation is auto-deleted after the response.

@@ -9,12 +9,15 @@ const crypto = require('crypto');
 const lib = require('./meta_lib.js');
 
 const PORT = parseInt(process.env.PORT || '3117', 10);
+const HOST = process.env.HOST || '127.0.0.1';
 const DATA = __dirname;
+const DATA_DIR = process.env.DATA_DIR || DATA;
 
 // ---------- persistent state ----------
-const statePath = DATA + '/state.json';
+const statePath = DATA_DIR + '/state.json';
 const state = {
   adminPassword: process.env.ADMIN_PASSWORD || 'meta-admin',
+  apiKey: process.env.API_KEY || '',
   autoDelete: true,
   defaultMode: 'fast',
   attachThreshold: 24000, // chars — above this, history rides as a document
@@ -52,8 +55,8 @@ function seedFirstAccount() {
   if (accounts.length) return;
   // seed from the live-verified session files if present
   try {
-    const cookie = fs.readFileSync(DATA + '/../meta_cookies.txt', 'utf8').trim();
-    const token = fs.readFileSync(DATA + '/../ecto1_token.txt', 'utf8').trim();
+    const cookie = process.env.SEED_COOKIE || fs.readFileSync(DATA + '/../meta_cookies.txt', 'utf8').trim();
+    const token = process.env.SEED_TOKEN || fs.readFileSync(DATA + '/../ecto1_token.txt', 'utf8').trim();
     if (cookie && token) {
       accounts.push({
         id: crypto.randomUUID(), label: 'primary', cookie, token,
@@ -215,6 +218,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/v1/chat/completions' && req.method === 'POST') {
+      if (state.apiKey) {
+        const h = (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '').trim();
+        if (!h || (h !== state.apiKey && !sessions.has(h))) { json(res, 401, { error: 'invalid api key (set Authorization: Bearer <key>)' }); return; }
+      }
       const body = JSON.parse((await readBody(req)).toString('utf8'));
       const messages = body.messages || [];
       const model = body.model || 'meta-instant';
@@ -293,7 +300,7 @@ const server = http.createServer(async (req, res) => {
           busy: accounts.filter(a => a.busy).length,
         },
         totals: accounts.reduce((t, a) => ({ requests: t.requests + a.stats.requests, successes: t.successes + a.stats.successes, failures: t.failures + a.stats.failures, deleted: t.deleted + a.stats.deleted }), { requests: 0, successes: 0, failures: 0, deleted: 0 }),
-        config: { ...state, adminPassword: undefined },
+        config: { ...state, adminPassword: undefined, apiKey: undefined, hasApiKey: !!state.apiKey },
         live: { openRequests: accounts.filter(a => a.busy).length },
       });
       return;
@@ -364,7 +371,7 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/config' && req.method === 'POST') {
       const body = JSON.parse((await readBody(req)).toString('utf8'));
-      for (const k of ['autoDelete', 'defaultMode', 'attachThreshold', 'quietMs', 'hardMs']) {
+      for (const k of ['autoDelete', 'defaultMode', 'attachThreshold', 'quietMs', 'hardMs', 'apiKey']) {
         if (k in body) state[k] = body[k];
       }
       for (const k of ['attachThreshold', 'quietMs', 'hardMs']) {
@@ -430,7 +437,7 @@ const server = http.createServer(async (req, res) => {
 
 loadState();
 seedFirstAccount();
-server.listen(PORT, '127.0.0.1', () => {
-  console.log('Meta Proxy listening on http://127.0.0.1:' + PORT);
+server.listen(PORT, HOST, () => {
+  console.log('Meta Proxy listening on http://' + HOST + ':' + PORT);
   console.log('accounts:', accounts.length, '| autoDelete:', state.autoDelete, '| attachThreshold:', state.attachThreshold);
 });
