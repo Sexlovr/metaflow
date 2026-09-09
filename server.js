@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const lib = require('./meta_lib.js');
 
 const PORT = parseInt(process.env.PORT || '3117', 10);
-const HOST = process.env.HOST || '127.0.0.1';
+const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 for Railway/Spaces; set HOST=127.0.0.1 locally if desired
 const DATA = __dirname;
 const DATA_DIR = process.env.DATA_DIR || DATA;
 
