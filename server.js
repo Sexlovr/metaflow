@@ -20,6 +20,7 @@ const state = {
   apiKey: process.env.API_KEY || '',
   enrollKey: process.env.ENROLL_KEY || '',
   attachMessage: 'continue as {{char}}',
+  corsEnabled: true,
   autoDelete: true,
   defaultMode: 'fast',
   attachThreshold: 24000, // chars — above this, history rides as a document
@@ -163,9 +164,18 @@ async function runCompletion({ messages, model, stream, onDelta, onThink, acc })
 }
 
 // ---------- HTTP plumbing ----------
+function corsHeaders() {
+  if (!state.corsEnabled) return {};
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Max-Age': '86400',
+  };
+}
 function json(res, code, obj) {
   const body = JSON.stringify(obj);
-  res.writeHead(code, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) });
+  res.writeHead(code, { ...corsHeaders(), 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) });
   res.end(body);
 }
 async function readBody(req, limit = 60 * 1024 * 1024) {
@@ -200,6 +210,11 @@ function serveStatic(res, urlPath) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   const p = url.pathname;
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, corsHeaders());
+    res.end();
+    return;
+  }
   try {
     // --- public: login ---
     if (p === '/api/login' && req.method === 'POST') {
@@ -257,6 +272,7 @@ const server = http.createServer(async (req, res) => {
 
       // streaming (SSE)
       res.writeHead(200, {
+        ...corsHeaders(),
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
@@ -292,14 +308,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // --- enrollment (key auth + CORS): used by the CDP harvester / bookmarklet ---
-    if (p === '/api/enroll' && req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      });
-      res.end(); return;
-    }
+    // /api/enroll preflight handled by the global OPTIONS catch-all + corsHeaders
     if (p === '/api/enroll' && req.method === 'POST') {
       let body = {};
       try { body = JSON.parse((await readBody(req)).toString('utf8')); } catch {}
@@ -400,7 +409,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/config' && req.method === 'POST') {
       const body = JSON.parse((await readBody(req)).toString('utf8'));
       if (body.rotateEnrollKey) { state.enrollKey = crypto.randomBytes(16).toString('hex'); }
-      for (const k of ['autoDelete', 'defaultMode', 'attachThreshold', 'quietMs', 'hardMs', 'apiKey', 'attachMessage']) {
+      for (const k of ['autoDelete', 'defaultMode', 'attachThreshold', 'quietMs', 'hardMs', 'apiKey', 'attachMessage', 'corsEnabled']) {
         if (k in body) state[k] = body[k];
       }
       for (const k of ['attachThreshold', 'quietMs', 'hardMs']) {

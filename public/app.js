@@ -543,6 +543,7 @@ async function loadSettings() {
     $('#cfgThreshold').value = s.config.attachThreshold;
     $('#cfgDefaultMode').value = s.config.defaultMode;
     $('#cfgAttachMessage').value = s.config.attachMessage || '';
+    $('#cfgCors').checked = !!s.config.corsEnabled;
   } catch {}
 }
 $('#cfgSave').addEventListener('click', async () => {
@@ -551,6 +552,7 @@ $('#cfgSave').addEventListener('click', async () => {
     attachThreshold: parseInt($('#cfgThreshold').value || '24000', 10),
     defaultMode: $('#cfgDefaultMode').value,
     attachMessage: $('#cfgAttachMessage').value,
+    corsEnabled: $('#cfgCors').checked,
   };
   const pw = $('#cfgPassword').value;
   if (pw) { if (pw.length < 4) { toast('Password too short (min 4)', 'err'); return; } body.adminPassword = pw; }
