@@ -149,14 +149,17 @@ async function runCompletion({ messages, model, stream, onDelta, onThink, acc })
     }
     s.close();
   }
-  if (result.answer && !result.timeout) acc.stats.successes++; else acc.stats.failures++;
+  const fin = result.finish || (result.timeout ? 'timeout' : 'complete');
+  if (fin === 'complete') acc.stats.successes++;
+  else if (fin === 'partial') acc.stats.partials = (acc.stats.partials || 0) + 1;
+  else acc.stats.failures++;
   logEvent({
     ev: 'completion', conv, account: acc.label, mode, ms: result.ms,
     answerChars: (result.answer || '').length, frames: result.frames,
-    timeout: !!result.timeout, attached: prompt.length > state.attachThreshold,
+    finish: result.finish || (result.timeout ? 'timeout' : 'complete'), attached: prompt.length > state.attachThreshold,
   });
   saveState();
-  return { ...result, conv, mode };
+  return { ...result, conv, mode, finish: result.finish || (result.timeout ? 'timeout' : 'complete') };
 }
 
 // ---------- HTTP plumbing ----------
@@ -240,7 +243,7 @@ const server = http.createServer(async (req, res) => {
           releaseAccount(acc);
           json(res, 200, {
             id, object: 'chat.completion', created, model,
-            choices: [{ index: 0, message: { role: 'assistant', content: r.answer || '' }, finish_reason: r.timeout ? 'length' : 'stop' }],
+            choices: [{ index: 0, message: { role: 'assistant', content: r.answer || '' }, finish_reason: r.finish === 'complete' ? 'stop' : 'length' }],
             usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
             meta: { conversation: r.conv, mode: r.mode, latency_ms: r.ms, account: acc.label },
           });
@@ -277,7 +280,8 @@ const server = http.createServer(async (req, res) => {
           send({ id, object: 'chat.completion.chunk', created, model, choices: [{ index: 0, delta: { content: finalAnswer.slice(i, i + chunkSize) }, finish_reason: null }] });
           await new Promise(rr => setTimeout(rr, 45));
         }
-        send({ id, object: 'chat.completion.chunk', created, model, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], meta: { conversation: r.conv, mode: r.mode, latency_ms: r.ms, account: acc.label, deleted: state.autoDelete, final_answer: finalAnswer } });
+        const finReason = r.finish === 'complete' ? 'stop' : 'length';
+        send({ id, object: 'chat.completion.chunk', created, model, choices: [{ index: 0, delta: {}, finish_reason: finReason }], meta: { conversation: r.conv, mode: r.mode, latency_ms: r.ms, account: acc.label, deleted: state.autoDelete, final_answer: finalAnswer, finish: r.finish } });
       } catch (e) {
         send({ id, object: 'chat.completion.chunk', created, model, choices: [{ index: 0, delta: { content: '\n[proxy error: ' + e.message + ']' }, finish_reason: 'stop' }] });
       }
@@ -323,7 +327,7 @@ const server = http.createServer(async (req, res) => {
           idle: accounts.filter(a => !a.busy && (a.cooldownUntil || 0) < Date.now()).length,
           busy: accounts.filter(a => a.busy).length,
         },
-        totals: accounts.reduce((t, a) => ({ requests: t.requests + a.stats.requests, successes: t.successes + a.stats.successes, failures: t.failures + a.stats.failures, deleted: t.deleted + a.stats.deleted }), { requests: 0, successes: 0, failures: 0, deleted: 0 }),
+        totals: accounts.reduce((t, a) => ({ requests: t.requests + a.stats.requests, successes: t.successes + a.stats.successes, partials: t.partials + (a.stats.partials || 0), failures: t.failures + a.stats.failures, deleted: t.deleted + a.stats.deleted }), { requests: 0, successes: 0, partials: 0, failures: 0, deleted: 0 }),
         config: { ...state, adminPassword: undefined, apiKey: undefined, hasApiKey: !!state.apiKey, enrollKey: undefined },
         live: { openRequests: accounts.filter(a => a.busy).length },
       });

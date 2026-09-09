@@ -489,3 +489,5 @@ body {
   background: rgba(0,0,0,0.35); padding: 4px 10px; border-radius: 6px;
   user-select: all; word-break: break-all; max-width: 320px;
 }
+
+.meta-cut { color: var(--warn); font-weight: 700; }

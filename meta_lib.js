@@ -412,18 +412,19 @@ class MetaSession {
       const timer = setInterval(() => {
         const quiet = Date.now() - lastT;
         const elapsed = Date.now() - started;
-        if (finalText !== null || (this.frames > 4 && quiet > quietMs && sawAnswer)) {
+        if (finalText !== null) {
           clearInterval(timer);
           this.onFrame = null;
-          resolve({
-            answer: finalText !== null ? finalText : answerDeltas.join(''),
-            think: thinkDeltas.join(''),
-            frames: this.frames, ms: elapsed,
-          });
+          resolve({ answer: finalText, think: thinkDeltas.join(''), frames: this.frames, ms: elapsed, finish: 'complete' });
+        } else if (this.frames > 4 && quiet > quietMs * 3 && sawAnswer) {
+          // stream went quiet without the completion frame — answer is PARTIAL
+          clearInterval(timer);
+          this.onFrame = null;
+          resolve({ answer: answerDeltas.join(''), think: thinkDeltas.join(''), frames: this.frames, ms: elapsed, finish: 'partial' });
         } else if (elapsed > hardMs || this.closed) {
           clearInterval(timer);
           this.onFrame = null;
-          resolve({ answer: answerDeltas.join(''), think: thinkDeltas.join(''), frames: this.frames, ms: elapsed, timeout: true });
+          resolve({ answer: answerDeltas.join(''), think: thinkDeltas.join(''), frames: this.frames, ms: elapsed, finish: 'timeout' });
         }
       }, 300);
       this.send(frame);

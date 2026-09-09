@@ -323,7 +323,7 @@ function updateDashboard(s) {
   $('#stRequests').textContent = s.totals.requests.toLocaleString();
   const total = s.totals.successes + s.totals.failures;
   $('#stSuccess').textContent = total ? Math.round((s.totals.successes / total) * 100) + '%' : '—';
-  $('#stSuccessFoot').textContent = s.totals.successes + ' ok · ' + s.totals.failures + ' fail';
+  $('#stSuccessFoot').textContent = s.totals.successes + ' ok · ' + (s.totals.partials || 0) + ' cut · ' + s.totals.failures + ' fail';
   const completions = logsCache.filter((x) => x.ev === 'completion');
   const avg = completions.length ? completions.reduce((t, x) => t + (x.ms || 0), 0) / completions.length : 0;
   $('#stLatency').textContent = avg ? (Math.round(avg / 100) / 10) + 's' : '—';
