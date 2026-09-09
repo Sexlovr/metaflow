@@ -1,0 +1,6 @@
+data: {"id":"chatcmpl-838062f4620234f5","object":"chat.completion.chunk","created":1788962439,"model":"meta-instant","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-838062f4620234f5","object":"chat.completion.chunk","created":1788962439,"model":"meta-instant","choices":[{"index":0,"delta":{"content":"\n[proxy error: no ecto1 token in page (status 403, cookies invalid or challenged?)]"},"finish_reason":"stop"}]}
+
+data: [DONE]
+

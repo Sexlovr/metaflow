@@ -1,0 +1,8 @@
+data: {"id":"chatcmpl-5309a15dbc0412bc","object":"chat.completion.chunk","created":1788962494,"model":"meta-instant","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-5309a15dbc0412bc","object":"chat.completion.chunk","created":1788962494,"model":"meta-instant","choices":[{"index":0,"delta":{"content":"RAILWAY-LIVE-OK"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-5309a15dbc0412bc","object":"chat.completion.chunk","created":1788962494,"model":"meta-instant","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"meta":{"conversation":"101faf9b-2fe7-4863-a45f-f1b1a4b1bd3e","mode":"fast","latency_ms":1502,"account":"primary","deleted":true,"final_answer":"RAILWAY-LIVE-OK"}}
+
+data: [DONE]
+

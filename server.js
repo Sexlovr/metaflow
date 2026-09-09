@@ -18,6 +18,7 @@ const statePath = DATA_DIR + '/state.json';
 const state = {
   adminPassword: process.env.ADMIN_PASSWORD || 'meta-admin',
   apiKey: process.env.API_KEY || '',
+  enrollKey: process.env.ENROLL_KEY || '',
   autoDelete: true,
   defaultMode: 'fast',
   attachThreshold: 24000, // chars — above this, history rides as a document
@@ -287,6 +288,30 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // --- enrollment (key auth + CORS): used by the CDP harvester / bookmarklet ---
+    if (p === '/api/enroll' && req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      });
+      res.end(); return;
+    }
+    if (p === '/api/enroll' && req.method === 'POST') {
+      let body = {};
+      try { body = JSON.parse((await readBody(req)).toString('utf8')); } catch {}
+      if (!state.enrollKey || body.key !== state.enrollKey) { json(res, 401, { error: 'bad enroll key' }); return; }
+      const cookie = (body.cookie || '').trim();
+      if (!cookie || !/ecto_1_sess/.test(cookie)) { json(res, 400, { error: 'cookie must contain ecto_1_sess' }); return; }
+      const acc = { id: crypto.randomUUID(), label: body.label || ('harvested-' + Date.now().toString(36)), cookie,
+        token: body.token && body.token.startsWith('ecto1:') ? body.token : null,
+        stats: { requests: 0, successes: 0, failures: 0, deleted: 0 }, cooldownUntil: 0, busy: false, lastUsed: 0, addedAt: Date.now() };
+      accounts.push(acc); saveState();
+      logEvent({ ev: 'account-enrolled', label: acc.label, hasToken: !!acc.token });
+      json(res, 200, { ok: true, id: acc.id, label: acc.label });
+      return;
+    }
+
     // --- admin API (session-token auth) ---
     const sess = auth(req);
     if (p.startsWith('/api/') && !sess) { json(res, 401, { error: 'auth required' }); return; }
@@ -300,14 +325,14 @@ const server = http.createServer(async (req, res) => {
           busy: accounts.filter(a => a.busy).length,
         },
         totals: accounts.reduce((t, a) => ({ requests: t.requests + a.stats.requests, successes: t.successes + a.stats.successes, failures: t.failures + a.stats.failures, deleted: t.deleted + a.stats.deleted }), { requests: 0, successes: 0, failures: 0, deleted: 0 }),
-        config: { ...state, adminPassword: undefined, apiKey: undefined, hasApiKey: !!state.apiKey },
+        config: { ...state, adminPassword: undefined, apiKey: undefined, hasApiKey: !!state.apiKey, enrollKey: undefined },
         live: { openRequests: accounts.filter(a => a.busy).length },
       });
       return;
     }
 
     if (p === '/api/accounts' && req.method === 'GET') {
-      json(res, 200, { accounts: accounts.map(a => ({
+      json(res, 200, { enrollKey: state.enrollKey, accounts: accounts.map(a => ({
         id: a.id, label: a.label, hasToken: !!a.token, tokenPreview: a.token ? a.token.slice(0, 14) + '…' : null,
         stats: a.stats, busy: a.busy, cooldownUntil: a.cooldownUntil, lastUsed: a.lastUsed, addedAt: a.addedAt,
         cookieNames: a.cookie.split(';').map(c => c.split('=')[0].trim()).filter(Boolean),
@@ -371,6 +396,7 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/config' && req.method === 'POST') {
       const body = JSON.parse((await readBody(req)).toString('utf8'));
+      if (body.rotateEnrollKey) { state.enrollKey = crypto.randomBytes(16).toString('hex'); }
       for (const k of ['autoDelete', 'defaultMode', 'attachThreshold', 'quietMs', 'hardMs', 'apiKey']) {
         if (k in body) state[k] = body[k];
       }
@@ -436,6 +462,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 loadState();
+if (!state.enrollKey) { state.enrollKey = crypto.randomBytes(16).toString('hex'); saveState(); }
 seedFirstAccount();
 server.listen(PORT, HOST, () => {
   console.log('Meta Proxy listening on http://' + HOST + ':' + PORT);

@@ -399,6 +399,18 @@ async function loadAccounts() {
   try {
     const obj = await api('/api/accounts').then((r) => r.json());
     renderAccounts(obj.accounts || []);
+    if (obj.enrollKey) {
+      const keyBox = document.querySelector('#enrollKeyBox');
+      if (keyBox) keyBox.textContent = obj.enrollKey;
+      const cmd = document.querySelector('#enrollCmd');
+      if (cmd) {
+        const url = location.origin;
+        const script = location.protocol === 'https:' ? 'harvest.js' : 'harvest.js';
+        cmd.textContent = 'node harvest.js ' + url + ' ' + obj.enrollKey;
+        cmd.title = 'click to copy';
+        cmd.onclick = () => { navigator.clipboard.writeText(cmd.textContent); toast('Command copied', 'ok'); };
+      }
+    }
   } catch {}
 }
 function renderAccounts(list) {

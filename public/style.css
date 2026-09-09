@@ -474,3 +474,18 @@ body {
   .settings-grid { grid-template-columns: 1fr; }
   .chat-threads { display: none; }
 }
+
+/* ---------- enroll panel ---------- */
+.enroll-panel { margin-bottom: 16px; }
+.enroll-cmd {
+  font-family: var(--mono); font-size: 12.5px; color: #a5b4fc;
+  background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 9px;
+  padding: 11px 15px; cursor: pointer; user-select: all;
+  white-space: nowrap; overflow-x: auto; transition: border-color 0.15s;
+}
+.enroll-cmd:hover { border-color: var(--border-bright); }
+.enroll-key {
+  font-family: var(--mono); font-size: 12px; color: var(--accent-a);
+  background: rgba(0,0,0,0.35); padding: 4px 10px; border-radius: 6px;
+  user-select: all; word-break: break-all; max-width: 320px;
+}

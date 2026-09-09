@@ -166,6 +166,15 @@
         <button class="btn btn-primary" id="addAccountBtn">+ Add account</button>
       </div>
       <p class="view-note">Each account = one parallel lane (simultaneous requests on the same account merge — the pool serializes per token). Login to meta.ai in a browser, copy the <code>Cookie</code> header, paste it below. The gateway mints the <code>ecto1</code> access token automatically from the page.</p>
+      <div class="panel enroll-panel">
+        <div class="panel-head">Easy enroll — one command from your machine</div>
+        <p class="view-note" style="margin-bottom:12px">Open meta.ai logged-in in Chrome (started with <code>--remote-debugging-port=9222</code>), then run the harvester — it pulls the full cookie jar (httpOnly included), mints the token from your IP, and enrolls the account here:</p>
+        <div class="enroll-cmd" id="enrollCmd">node harvest.js &lt;this-proxy-url&gt; &lt;enroll-key&gt;</div>
+        <div class="setting-row" style="border:none;padding-top:8px">
+          <div><b>Enroll key</b><span class="setting-sub">rotates in Settings</span></div>
+          <code id="enrollKeyBox" class="enroll-key">…</code>
+        </div>
+      </div>
       <div id="accountList" class="account-grid"></div>
 
       <div id="addAccountModal" class="modal hidden">
