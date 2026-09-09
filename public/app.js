@@ -155,7 +155,7 @@ function messageHtml(m) {
     ? `<div class="thinking-block"><div class="thinking-head">thought process</div><div class="thinking-body">${esc(m.think)}</div></div>`
     : '';
   const meta = m.meta
-    ? `<div class="msg-meta"><span class="meta-ok">✓ shredded</span><span>${m.meta.mode}</span><span>${Math.round(m.meta.latency_ms / 100) / 10}s</span><span>${m.meta.account}</span></div>`
+    ? `<div class="msg-meta"><span class="meta-${m.meta.finish && m.meta.finish !== 'complete' ? 'cut' : 'ok'}">${m.meta.finish && m.meta.finish !== 'complete' ? '⚠ cut (' + esc(m.meta.finish) + ')' : '✓ shredded'}</span><span>${m.meta.mode}</span><span>${Math.round(m.meta.latency_ms / 100) / 10}s</span><span>${esc(m.meta.account || '')}</span></div>`
     : '';
   return `<div class="msg assistant"><div class="msg-avatar">M</div><div class="msg-body"><div class="msg-role">Meta AI</div>${think}<div class="msg-bubble">${esc(m.content)}</div>${meta}</div></div>`;
 }
@@ -294,7 +294,8 @@ async function sendMessage() {
     if (meta) {
       const m = document.createElement('div');
       m.className = 'msg-meta';
-      m.innerHTML = `<span class="meta-ok">✓ shredded</span><span>${meta.mode}</span><span>${Math.round(meta.latency_ms / 100) / 10}s</span><span>${esc(meta.account || '')}</span>`;
+      const cut = meta.finish && meta.finish !== 'complete';
+      m.innerHTML = `<span class="meta-${cut ? 'cut' : 'ok'}">${cut ? '⚠ cut (' + esc(meta.finish) + ')' : '✓ shredded'}</span><span>${meta.mode}</span><span>${Math.round(meta.latency_ms / 100) / 10}s</span><span>${esc(meta.account || '')}</span>`;
       wrap.querySelector('.msg-body').appendChild(m);
     }
     t.messages.push({ role: 'assistant', content: answer, think, meta });
@@ -339,7 +340,7 @@ function renderPoolHealth(s) {
 }
 function renderRecentEvents() {
   const rows = logsCache.slice(0, 14).map((l) => {
-    const cls = /delet|success|ok/.test(l.ev) ? 'ok' : /fail|error|timeout/.test(l.ev + ' ' + (l.result || '')) ? 'err' : /upload|session/.test(l.ev) ? 'info' : 'warn';
+    const cls = (/delet|success|ok/.test(l.ev) && !(l.finish && l.finish !== 'complete')) ? 'ok' : /fail|error|timeout/.test(l.ev + ' ' + (l.finish || '') + ' ' + (l.result || '')) ? 'err' : /upload|session/.test(l.ev) ? 'info' : 'warn';
     const det = l.ev === 'completion'
       ? `${l.account} · ${l.mode} · ${Math.round((l.ms || 0) / 100) / 10}s · ${(l.answerChars || 0)} chars${l.attached ? ' · doc' : ''}`
       : l.ev === 'conversation-deleted' ? l.conv.slice(0, 8)
@@ -489,7 +490,7 @@ async function loadLogs() {
 }
 function renderLogs() {
   $('#logTable').innerHTML = logsCache.map((l) => {
-    const cls = /delet|success|ok/.test(l.ev) ? 'ok' : /fail|error|timeout/.test(l.ev) ? 'err' : /upload|session|open/.test(l.ev) ? 'info' : 'warn';
+    const cls = (/delet|success|ok/.test(l.ev) && !(l.finish && l.finish !== 'complete')) ? 'ok' : /fail|error|timeout|partial/.test(l.ev + ' ' + (l.finish || '')) ? 'err' : /upload|session|open|enroll/.test(l.ev) ? 'info' : 'warn';
     const det = JSON.stringify(l).slice(1, -1);
     return `<div class="log-row ${cls}" title="${esc(JSON.stringify(l))}"><span class="log-time">${fmtTime(l.t)}</span><span class="log-ev">${esc(l.ev)}</span><span class="log-detail">${esc(det)}</span></div>`;
   }).join('') || '<p class="view-note">No events yet.</p>';
