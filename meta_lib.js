@@ -511,19 +511,42 @@ async function deleteConversation(cookie, convId) {
 
 // ---------- OpenAI messages -> Meta prompt ----------
 function messagesToPrompt(messages) {
-  // Returns { prompt, systemPrefix }: role-marked transcript in ONE blob (stateless style).
-  const sys = [];
+  // Fidelity (chinese-gemini standard): leading system hoists to a top [System] block;
+  // mid-conversation system stays INLINE at its exact position; function role renders
+  // as Tool; non-text content parts leave an [image attached] marker (never silent drops).
+  const leading = [];
   const turns = [];
+  let seenTurn = false;
   for (const m of messages) {
-    const content = typeof m.content === 'string' ? m.content : (Array.isArray(m.content) ? m.content.filter(p => p.type === 'text').map(p => p.text).join('\n') : '');
-    if (m.role === 'system' || m.role === 'developer') sys.push(content);
-    else if (m.role === 'user') turns.push('User: ' + content);
-    else if (m.role === 'assistant') turns.push('Assistant: ' + content);
-    else if (m.role === 'tool') turns.push('Tool: ' + content);
+    let content = '';
+    let hasMedia = false;
+    if (typeof m.content === 'string') {
+      content = m.content;
+    } else if (Array.isArray(m.content)) {
+      const texts = [];
+      for (const p of m.content) {
+        if (p && p.type === 'text' && typeof p.text === 'string') texts.push(p.text);
+        else if (p && p.type !== 'text') hasMedia = true;
+      }
+      content = texts.join('\n');
+      if (hasMedia) content = (content ? content + '\n' : '') + '[image attached]';
+    }
+    if (m.role === 'system' || m.role === 'developer') {
+      if (!seenTurn && content) leading.push(content);
+      else turns.push('[System] ' + content);
+    } else if (m.role === 'user') {
+      turns.push('User: ' + content);
+      seenTurn = true;
+    } else if (m.role === 'assistant') {
+      turns.push('Assistant: ' + content);
+      seenTurn = true;
+    } else if (m.role === 'tool' || m.role === 'function') {
+      turns.push('Tool: ' + content);
+      seenTurn = true;
+    }
   }
-  const sysBlock = sys.length ? '[System]\n' + sys.join('\n\n') + '\n\n' : '';
+  const sysBlock = leading.length ? '[System]\n' + leading.join('\n\n') + '\n\n' : '';
   const body = turns.join('\n\n');
-  // If multi-turn, instruct the model to continue the conversation
   const prompt = turns.length > 1
     ? sysBlock + body + '\n\n[System]\nContinue the conversation above. Reply ONLY as the Assistant to the last User message. Do not repeat the transcript.'
     : sysBlock + body;

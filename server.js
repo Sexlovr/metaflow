@@ -19,6 +19,7 @@ const state = {
   adminPassword: process.env.ADMIN_PASSWORD || 'meta-admin',
   apiKey: process.env.API_KEY || '',
   enrollKey: process.env.ENROLL_KEY || '',
+  attachMessage: 'continue as {{char}}',
   autoDelete: true,
   defaultMode: 'fast',
   attachThreshold: 24000, // chars — above this, history rides as a document
@@ -127,10 +128,8 @@ async function runCompletion({ messages, model, stream, onDelta, onThink, acc })
         filename: 'context.txt', mime: 'text/plain',
       });
       logEvent({ ev: 'doc-upload', conv, mediaId, size: prompt.length, account: acc.label });
-      const lastUser = [...messages].reverse().find(m => m.role === 'user');
-      const lastText = typeof lastUser?.content === 'string' ? lastUser.content : 'Please respond to the conversation in the attached document.';
       result = await s.askAttach(
-        'The attached document contains our full conversation transcript and instructions. Respond to the FINAL message in it, as the Assistant.\n\nFinal message: ' + lastText.slice(0, 3000),
+        state.attachMessage || 'continue as {{char}}',
         mediaId, 'text/plain', 'context.txt', mode, { ...opts, quietMs: 25000 },
       );
     } else {
@@ -397,7 +396,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/config' && req.method === 'POST') {
       const body = JSON.parse((await readBody(req)).toString('utf8'));
       if (body.rotateEnrollKey) { state.enrollKey = crypto.randomBytes(16).toString('hex'); }
-      for (const k of ['autoDelete', 'defaultMode', 'attachThreshold', 'quietMs', 'hardMs', 'apiKey']) {
+      for (const k of ['autoDelete', 'defaultMode', 'attachThreshold', 'quietMs', 'hardMs', 'apiKey', 'attachMessage']) {
         if (k in body) state[k] = body[k];
       }
       for (const k of ['attachThreshold', 'quietMs', 'hardMs']) {

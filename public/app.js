@@ -541,6 +541,7 @@ async function loadSettings() {
     $('#cfgAutoDelete').checked = !!s.config.autoDelete;
     $('#cfgThreshold').value = s.config.attachThreshold;
     $('#cfgDefaultMode').value = s.config.defaultMode;
+    $('#cfgAttachMessage').value = s.config.attachMessage || '';
   } catch {}
 }
 $('#cfgSave').addEventListener('click', async () => {
@@ -548,6 +549,7 @@ $('#cfgSave').addEventListener('click', async () => {
     autoDelete: $('#cfgAutoDelete').checked,
     attachThreshold: parseInt($('#cfgThreshold').value || '24000', 10),
     defaultMode: $('#cfgDefaultMode').value,
+    attachMessage: $('#cfgAttachMessage').value,
   };
   const pw = $('#cfgPassword').value;
   if (pw) { if (pw.length < 4) { toast('Password too short (min 4)', 'err'); return; } body.adminPassword = pw; }
